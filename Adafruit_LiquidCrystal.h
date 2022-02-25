@@ -250,6 +250,7 @@ public:
   void command(uint8_t);
 
 private:
+  bool isBusy(void);
   void send(uint8_t value, boolean mode);
   void write4bits(uint8_t);
   void write8bits(uint8_t);

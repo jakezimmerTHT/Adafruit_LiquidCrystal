@@ -391,8 +391,37 @@ void Adafruit_LiquidCrystal::_pinMode(uint8_t p, uint8_t d) {
   }
 }
 
+bool Adafruit_LiquidCrystal::isBusy() {
+    const uint8_t busyPinIdx = 0x07;
+    bool busy;
+
+    for (int i = 0; i < sizeof(_data_pins) / sizeof(_data_pins[0]); i++) {
+        pinMode(_data_pins[i], INPUT_PULLUP);
+    }
+
+    
+    _digitalWrite(_rs_pin, LOW);
+    _digitalWrite(_rw_pin, HIGH);
+    _digitalWrite(_enable_pin, HIGH);
+    delayMicroseconds(100);
+    busy = digitalRead(_data_pins[3]) == HIGH;
+    _digitalWrite(_enable_pin, LOW);
+    _digitalWrite(_rw_pin, LOW);
+    _digitalWrite(_rs_pin, HIGH);
+
+    delayMicroseconds(100);
+    for (int i = 0; i < sizeof(_data_pins) / sizeof(_data_pins[0]); i++) {
+        pinMode(_data_pins[i], OUTPUT);
+    }
+    return busy;
+}
+
 // write either command or data, with automatic 4/8-bit selection
 void Adafruit_LiquidCrystal::send(uint8_t value, boolean mode) {
+  while (isBusy()){
+      delayMicroseconds(100);
+  }
+  delayMicroseconds(100);
   _digitalWrite(_rs_pin, mode);
 
   // if there is a RW pin indicated, set it low to Write
@@ -406,6 +435,7 @@ void Adafruit_LiquidCrystal::send(uint8_t value, boolean mode) {
     write4bits(value >> 4);
     write4bits(value);
   }
+  
 }
 
 void Adafruit_LiquidCrystal::pulseEnable(void) {
