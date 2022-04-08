@@ -383,7 +383,7 @@ inline size_t Adafruit_LiquidCrystal::write(uint8_t value) {
         _isResetting = true;
         rewriteAll();
         _isResetting = false;
-        command(LCD_SETDDRAMADDR | _currentbufferindex);
+        command(LCD_SETDDRAMADDR | curpos);
     }
     _currentbufferindex = tempindexpostion;
     
