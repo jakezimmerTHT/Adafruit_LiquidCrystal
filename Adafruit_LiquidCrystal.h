@@ -248,15 +248,16 @@ public:
    * @param value Command to send
    */
   void command(uint8_t);
+
+
+private:
   void receive(uint8_t &value, bool mode);
-  void resync4BitMode(void);
-  void rewriteAll(void);
   void write4bits(uint8_t);
   void write8bits(uint8_t);
   void pulseEnable();
-
-private:
-  bool isBusy(void);
+  bool isBusy(void); // checks busy flag and updates _currentcursorposition
+  void resync4BitMode(void);
+  void rewriteAll(void);
   void send(uint8_t value, boolean mode);
   void read4bits(uint8_t &value, bool mode);
   void read8bits(uint8_t &value, bool mode);
@@ -286,7 +287,7 @@ private:
   const uint8_t _DDRAM_MODE = HIGH;
   const uint8_t _INSTR_MODE = LOW;
   const uint8_t _BLANK_CHAR = 0b100000;
-  const uint8_t _read_delay_time = 50;
+  const uint8_t _READ_DELAY_TIME = 50;
   uint8_t _currentcursorposition;
   uint8_t _currentbufferindex;
   uint8_t _expecteddramcontents[_MAX_DDRAM_SIZE];

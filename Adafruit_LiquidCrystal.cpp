@@ -22,8 +22,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <stdlib.h>
-
 // FOR Arduino Due
 #if !defined(_BV)
 #define _BV(bit) (1 << (bit)) //!< bitshifts 1 over by 'bit' binary places
@@ -460,7 +458,7 @@ bool Adafruit_LiquidCrystal::isBusy() {
     read4bits(value, _INSTR_MODE);
     busy = value & busyBitIdx;
     _currentcursorposition = value & ~busyBitIdx;
-    delayMicroseconds(_read_delay_time);
+    delayMicroseconds(_READ_DELAY_TIME);
     for (int i = 0; i < sizeof(_data_pins) / sizeof(_data_pins[0]); i++) {
         pinMode(_data_pins[i], OUTPUT);
     }
@@ -551,7 +549,7 @@ void Adafruit_LiquidCrystal::write8bits(uint8_t value) {
 
 // write data, with automatic 4/8-bit selection
 void Adafruit_LiquidCrystal::receive(uint8_t &value, bool mode) {
-  delayMicroseconds(_read_delay_time);
+  delayMicroseconds(_READ_DELAY_TIME);
   _digitalWrite(_rs_pin, mode);
 
   // if there is a RW pin indicated, set it low to Write
@@ -577,7 +575,7 @@ void Adafruit_LiquidCrystal::read4bits(uint8_t &value, bool mode) {
   _digitalWrite(_rs_pin, mode);
   _digitalWrite(_rw_pin, HIGH);
   _digitalWrite(_enable_pin, HIGH);
-  delayMicroseconds(_read_delay_time);
+  delayMicroseconds(_READ_DELAY_TIME);
   for (int i = 0; i < 4; i++) {
     // bits are read in MSBFIRST
     _pinMode(_data_pins[i], INPUT);
@@ -594,7 +592,7 @@ void Adafruit_LiquidCrystal::read8bits(uint8_t &value, bool mode) {
   _digitalWrite(_rs_pin, mode);
   _digitalWrite(_rw_pin, HIGH);
   _digitalWrite(_enable_pin, HIGH);
-  delayMicroseconds(_read_delay_time);
+  delayMicroseconds(_READ_DELAY_TIME);
   for (int i = 0; i < 8; i++) {
     // bits are read in MSBFIRST
     _pinMode(_data_pins[i], INPUT);
