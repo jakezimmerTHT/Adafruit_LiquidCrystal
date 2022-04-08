@@ -248,12 +248,22 @@ public:
    * @param value Command to send
    */
   void command(uint8_t);
+  void checkDisplay(uint8_t diagnostics_level = 0);
+  void receive(uint8_t &value, bool mode);
+  void resync4BitMode(void);
+  void rewriteAll(void);
+  void send(uint8_t, uint8_t);
+  void write4bits(uint8_t);
+  void write8bits(uint8_t);
+  void pulseEnable();
 
 private:
   bool isBusy(void);
   void send(uint8_t value, boolean mode);
   void write4bits(uint8_t);
   void write8bits(uint8_t);
+  void read4bits(uint8_t &value);
+  void read8bits(uint8_t &value);
   void pulseEnable();
   void _digitalWrite(uint8_t, uint8_t);
   void _pinMode(uint8_t, uint8_t);
@@ -276,6 +286,16 @@ private:
 
   uint8_t _i2cAddr;
   Adafruit_MCP23008 _i2c;
+
+  const static uint8_t _MAX_DDRAM_SIZE = 80;
+  const uint8_t _DDRAM_MODE = HIGH;
+  const uint8_t _INSTR_MODE = LOW;
+  const uint8_t _BLANK_CHAR = 0b100000;
+  const uint8_t _read_delay_time = 50;
+  uint8_t _currentcursorposition;
+  uint8_t _currentbufferindex;
+  uint8_t _expecteddramcontents[_MAX_DDRAM_SIZE];
+
 };
 
 #endif

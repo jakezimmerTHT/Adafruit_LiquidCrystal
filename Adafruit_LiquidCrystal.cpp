@@ -245,6 +245,12 @@ void Adafruit_LiquidCrystal::begin(uint8_t cols, uint8_t lines,
 
 /********** high level commands, for the user! */
 void Adafruit_LiquidCrystal::clear() {
+  for (uint8_t i = 0; i < _MAX_DDRAM_SIZE; i++)
+  {
+      _expecteddramcontents[i] = _BLANK_CHAR;
+      _currentbufferindex = 0;
+      setCursor(0,0);
+  }
   command(LCD_CLEARDISPLAY); // clear display, set cursor position to zero
   delayMicroseconds(2000);   // this command takes a long time!
 }
@@ -260,7 +266,10 @@ void Adafruit_LiquidCrystal::setCursor(uint8_t col, uint8_t row) {
     row = _numlines - 1; // we count rows starting w/0
   }
 
-  command(LCD_SETDDRAMADDR | (col + row_offsets[row]));
+  uint8_t index_offsets[] = {0, 40, 20, 60};
+  _currentbufferindex = index_offsets[row] + col;
+  _currentcursorposition = col + row_offsets[row];
+  command(LCD_SETDDRAMADDR | _currentcursorposition);
 }
 
 // Turn the display on/off (quickly)
@@ -345,8 +354,138 @@ inline size_t Adafruit_LiquidCrystal::write(uint8_t value) {
   return 1;
 }
 #else
-inline void Adafruit_LiquidCrystal::write(uint8_t value) { send(value, HIGH); }
+inline void Adafruit_LiquidCrystal::write(uint8_t value) { 
+    send(value, HIGH); 
+    uint8_t temp = 0;
+    receive(value, _DDRAM_MODE);
+    if (temp != value) {
+        rewriteAll();
+    }
+}
 #endif
+
+/************ mid level commands, for syncing data *****/
+void Adafruit_LiquidCrystal::resync4BitMode(void) {
+    // set to 8-bit interface
+    _digitalWrite(_rs_pin, LOW);
+    _digitalWrite(_rw_pin, LOW);
+    delayMicroseconds(1);
+    write4bits(0x03);
+    delayMicroseconds(5000); // wait min 4.1ms
+
+
+    write4bits(0x03);
+    delayMicroseconds(5000); // wait min 4.1ms
+    
+    write4bits(0x03); // now supposed to be in 8-bit mode
+    delayMicroseconds(1000);
+
+    // set to 4-bit interface
+    write4bits(0x02);
+    delayMicroseconds(1000);
+
+    write4bits(0x02);
+    delayMicroseconds(1000);
+
+    write4bits(_displayfunction & 0xF);
+    delayMicroseconds(1000);
+
+    // home();
+
+    // command(LCD_SETDDRAMADDR | _currentcursorposition);
+
+    // _displaymode &= ~LCD_ENTRYSHIFTINCREMENT;
+    // command(LCD_ENTRYMODESET | _displaymode);
+
+    // write4bits(0x02);
+    // delayMicroseconds(500);
+
+    // write4bits(0x02);
+    // delayMicroseconds(500);
+}
+
+// rewrite all data on the LCD
+void Adafruit_LiquidCrystal::rewriteAll(){
+    setCursor(0,0);
+    resync4BitMode();
+    delay(10);
+    setCursor(0,0);
+    for(uint8_t i = 0; i < _MAX_DDRAM_SIZE; i++) {
+        send(_expecteddramcontents[i], _DDRAM_MODE);
+    }
+}
+
+// intermittently check the display to make sure it is 
+// displaying the correct information
+/**
+ * @brief check that the display ddram is holding the correct information
+ * 
+ * @param diagnostics_level 0 is quiet, 1 is warn on error, 2 is print ddram
+ */
+void Adafruit_LiquidCrystal::checkDisplay(uint8_t diagnostics_level = 0) {
+    unsigned long before = micros();
+    uint8_t displaydram[_MAX_DDRAM_SIZE];
+    uint8_t tempcursorposition = _currentcursorposition;
+    
+    bool match = true;
+    
+    setCursor(0,0);
+    delayMicroseconds(_read_delay_time);
+    while (isBusy()){
+      delayMicroseconds(_read_delay_time);
+    }
+    for (uint8_t i = 0; i < _MAX_DDRAM_SIZE; i++)
+    {
+        receive(displaydram[i], _DDRAM_MODE);
+        if (displaydram[i] != _expecteddramcontents[i]){
+            match = false;
+        }
+    }
+
+    if (diagnostics_level > 0 && match == false) {
+                Serial.println("DISPLAY MISMATCH");
+            }
+
+    if (diagnostics_level > 1) {
+        Serial.print("DDRAM:   ");
+        for (uint8_t i = 0; i < _MAX_DDRAM_SIZE; i++) {
+            Serial.print((uint8_t)displaydram[i], HEX);
+            Serial.print(", ");
+        }
+        Serial.println();
+        Serial.print("EXPECTED:");
+        for (uint8_t i = 0; i < _MAX_DDRAM_SIZE; i++) {
+            Serial.print((uint8_t)_expecteddramcontents[i], HEX);
+            Serial.print(", ");
+        }
+        Serial.println();
+        Serial.print("DDRAM:   ");
+        for (uint8_t i = 0; i < _MAX_DDRAM_SIZE; i++) {
+            Serial.print((char)displaydram[i]);
+            Serial.print(", ");
+        }
+        Serial.println();
+        Serial.print("EXPECTED:");
+        for (uint8_t i = 0; i < _MAX_DDRAM_SIZE; i++) {
+            Serial.print((char)_expecteddramcontents[i]);
+            Serial.print(", ");
+        }
+        Serial.println();
+        
+    }
+
+    unsigned long after = micros();
+    if (diagnostics_level > 0) { Serial.println(after-before); }
+    
+    // if (match == false) {
+    //     if (!(_displayfunction & LCD_8BITMODE)) {
+    //         resync4BitMode();
+    //         delay(5);
+    //     }
+    // }
+
+  
+}
 
 /************ low level data pushing commands **********/
 
@@ -399,25 +538,35 @@ bool Adafruit_LiquidCrystal::isBusy() {
         pinMode(_data_pins[i], INPUT_PULLUP);
     }
 
-    
     _digitalWrite(_rs_pin, LOW);
     _digitalWrite(_rw_pin, HIGH);
     _digitalWrite(_enable_pin, HIGH);
-    delayMicroseconds(100);
+    delayMicroseconds(1);
     busy = digitalRead(_data_pins[3]) == HIGH;
     _digitalWrite(_enable_pin, LOW);
     _digitalWrite(_rw_pin, LOW);
     _digitalWrite(_rs_pin, HIGH);
 
-    delayMicroseconds(100);
+    delayMicroseconds(_read_delay_time);
     for (int i = 0; i < sizeof(_data_pins) / sizeof(_data_pins[0]); i++) {
         pinMode(_data_pins[i], OUTPUT);
     }
     return busy;
 }
 
+
+
 // write either command or data, with automatic 4/8-bit selection
 void Adafruit_LiquidCrystal::send(uint8_t value, boolean mode) {
+  if (mode == _DDRAM_MODE) {
+    uint8_t line_width = 20;
+    uint8_t index_offset[] = {0, 40, 20, 60};
+    _expecteddramcontents[_currentbufferindex] = value;
+    _currentbufferindex++;
+  }
+
+  
+  
   while (isBusy()){
       delayMicroseconds(100);
   }
@@ -473,19 +622,80 @@ void Adafruit_LiquidCrystal::write4bits(uint8_t value) {
     _i2c.writeGPIO(out);
     delayMicroseconds(100);
   } else {
+      noInterrupts();
     for (int i = 0; i < 4; i++) {
       _pinMode(_data_pins[i], OUTPUT);
       _digitalWrite(_data_pins[i], (value >> i) & 0x01);
     }
     pulseEnable();
+    interrupts();
   }
 }
 
 void Adafruit_LiquidCrystal::write8bits(uint8_t value) {
+  if (_i2cAddr != 255) {
+    return;
+  } 
+
   for (int i = 0; i < 8; i++) {
     _pinMode(_data_pins[i], OUTPUT);
     _digitalWrite(_data_pins[i], (value >> i) & 0x01);
   }
-
   pulseEnable();
+}
+
+
+
+// write data, with automatic 4/8-bit selection
+void Adafruit_LiquidCrystal::receive(uint8_t &value, bool mode) {
+  delayMicroseconds(_read_delay_time);
+  _digitalWrite(_rs_pin, mode);
+
+  // if there is a RW pin indicated, set it low to Write
+  if (_rw_pin != 255) {
+    _digitalWrite(_rw_pin, HIGH);
+  }
+  value = 0;
+  if (_displayfunction & LCD_8BITMODE) {
+    read8bits(value);
+  } else {
+    read4bits(value);
+    value = value << 4;
+    read4bits(value);
+  }
+  
+}
+
+void Adafruit_LiquidCrystal::read4bits(uint8_t &value) {
+  if (_i2cAddr != 255) {
+    return;
+  } 
+  // 4 bit parallel mode
+  _digitalWrite(_rw_pin, HIGH);
+  _digitalWrite(_enable_pin, HIGH);
+  delayMicroseconds(_read_delay_time);
+  for (int i = 0; i < 4; i++) {
+    // bits are read in MSBFIRST
+    _pinMode(_data_pins[i], INPUT);
+    value |= (digitalRead(_data_pins[i]) & 0x01) << i;
+  }
+  _digitalWrite(_enable_pin, LOW);
+  _digitalWrite(_rw_pin, LOW);
+}
+
+void Adafruit_LiquidCrystal::read8bits(uint8_t &value) {
+  if (_i2cAddr != 255) {
+    return;
+  } 
+  _digitalWrite(_rw_pin, HIGH);
+  _digitalWrite(_enable_pin, HIGH);
+  delayMicroseconds(_read_delay_time);
+  for (int i = 0; i < 8; i++) {
+    // bits are read in MSBFIRST
+    _pinMode(_data_pins[i], INPUT);
+    value = value << 1;
+    value |= (digitalRead(_data_pins[i]) & 0x01);
+  }
+  _digitalWrite(_enable_pin, LOW);
+  _digitalWrite(_rw_pin, LOW);
 }
