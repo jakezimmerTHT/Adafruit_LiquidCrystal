@@ -175,6 +175,7 @@ void Adafruit_LiquidCrystal::begin(uint8_t cols, uint8_t lines,
     _displayfunction |= LCD_2LINE;
   }
   _numlines = lines;
+  _numcols = cols;
   _currline = 0;
 
   // for some 1 line displays you can select a 10 pixel high font
@@ -357,35 +358,33 @@ inline void Adafruit_LiquidCrystal::command(uint8_t value) { send(value, LOW); }
 
 #if ARDUINO >= 100
 inline size_t Adafruit_LiquidCrystal::write(uint8_t value) {
-    Serial.print("w");
-    if (_isResetting == false && rand() % 100 < 1) {
-        Serial.println("WEEEEE");
-        pulseEnable();
-    }
   while (isBusy()){
       delayMicroseconds(100);
   }
-  send(value, HIGH);
   uint8_t curpos = _currentcursorposition; // just updated by isBusy
-  uint8_t temp = 0;
+  uint8_t readback = 0;
+  
+  send(value, HIGH);
+  
   while (isBusy()){
       delayMicroseconds(100);
   }
   uint8_t newcurpos = _currentcursorposition;
+  
   command(LCD_SETDDRAMADDR | curpos);
-  receive(temp, _DDRAM_MODE);
+  receive(readback, _DDRAM_MODE);
   command(LCD_SETDDRAMADDR | newcurpos);
-    // Serial.print(temp);
-    // Serial.print("\t");
-    // Serial.println(value);
+  
+
+  if (readback != value) {
     uint8_t tempindexpostion = _currentbufferindex;
-    if (temp != value) {
-        _isResetting = true;
-        rewriteAll();
-        _isResetting = false;
-        command(LCD_SETDDRAMADDR | curpos);
-    }
+    _isResetting = true;
+    rewriteAll();
+    _isResetting = false;
+    command(LCD_SETDDRAMADDR | curpos);
     _currentbufferindex = tempindexpostion;
+  }
+
     
   return 1;
 }
@@ -396,40 +395,9 @@ inline void Adafruit_LiquidCrystal::write(uint8_t value) {
 #endif
 
 /************ mid level commands, for syncing data *****/
-void Adafruit_LiquidCrystal::resync4BitMode(void) {
-
-    begin(20,4);
-
-    return;
-    // set to 8-bit interface
-    _digitalWrite(_rs_pin, LOW);
-    _digitalWrite(_rw_pin, LOW);
-    delayMicroseconds(1);
-    write4bits(0x03);
-    delayMicroseconds(5000); // wait min 4.1ms
-
-
-    write4bits(0x03);
-    delayMicroseconds(5000); // wait min 4.1ms
-    
-    write4bits(0x03); // now supposed to be in 8-bit mode
-    delayMicroseconds(1000);
-
-    // set to 4-bit interface
-    write4bits(0x02);
-    delayMicroseconds(1000);
-
-    write4bits(0x02);
-    delayMicroseconds(1000);
-
-    write4bits(_displayfunction & 0xF);
-    delayMicroseconds(1000);
-    
-}
-
 // rewrite all data on the LCD
 void Adafruit_LiquidCrystal::rewriteAll(){
-    resync4BitMode();
+    begin(_numcols, _numlines);
     delay(10);
     for(uint8_t i = 0; i < _MAX_DDRAM_SIZE; i++) {
         send(_expecteddramcontents[i], _DDRAM_MODE);

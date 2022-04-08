@@ -279,7 +279,7 @@ private:
 
   uint8_t _initialized;
 
-  uint8_t _numlines, _currline;
+  uint8_t _numlines, _currline, _numcols;
 
   uint8_t _SPIclock, _SPIdata, _SPIlatch;
   uint8_t _SPIbuff;
