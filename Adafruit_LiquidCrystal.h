@@ -248,11 +248,9 @@ public:
    * @param value Command to send
    */
   void command(uint8_t);
-  void checkDisplay(uint8_t diagnostics_level = 0);
   void receive(uint8_t &value, bool mode);
   void resync4BitMode(void);
   void rewriteAll(void);
-//   void send(uint8_t, uint8_t);
   void write4bits(uint8_t);
   void write8bits(uint8_t);
   void pulseEnable();
@@ -260,11 +258,8 @@ public:
 private:
   bool isBusy(void);
   void send(uint8_t value, boolean mode);
-//   void write4bits(uint8_t);
-//   void write8bits(uint8_t);
   void read4bits(uint8_t &value, bool mode);
   void read8bits(uint8_t &value, bool mode);
-//   void pulseEnable();
   void _digitalWrite(uint8_t, uint8_t);
   void _pinMode(uint8_t, uint8_t);
 
