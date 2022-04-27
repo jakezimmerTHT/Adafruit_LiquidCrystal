@@ -356,23 +356,34 @@ inline void Adafruit_LiquidCrystal::command(uint8_t value) { send(value, LOW); }
 
 #if ARDUINO >= 100
 inline size_t Adafruit_LiquidCrystal::write(uint8_t value) {
+  uint8_t curpos = _currentcursorposition; // just updated by isBusy
+  uint8_t readback = 0;
+  bool actually_write = value != _expecteddramcontents[_currentbufferindex];
+  if (actually_write){
+    while (isBusy()){
+        delayMicroseconds(100);
+    }
+    curpos = _currentcursorposition; // just updated by isBusy    
+    send(value, HIGH);
+  }
+  else{
+      _currentbufferindex++;
+  }
+
+  
   while (isBusy()){
       delayMicroseconds(100);
   }
-  uint8_t curpos = _currentcursorposition; // just updated by isBusy
-  uint8_t readback = 0;
-  
-  send(value, HIGH);
-  
-  while (isBusy()){
-      delayMicroseconds(100);
+  if (!actually_write){
+      curpos = _currentcursorposition;
   }
   uint8_t newcurpos = _currentcursorposition;
   
   command(LCD_SETDDRAMADDR | curpos);
   receive(readback, _DDRAM_MODE);
-  command(LCD_SETDDRAMADDR | newcurpos);
-  
+  if (actually_write){
+    command(LCD_SETDDRAMADDR | newcurpos);
+  }
 
   if (readback != value) {
     uint8_t tempindexpostion = _currentbufferindex;
